@@ -2,13 +2,14 @@
 #------------------------------------------------------------------------------------------------------------------------
 options (stringsAsFactors=FALSE)
 printf <- function(...) print(noquote(sprintf(...)))
+library(RCurl)
 #------------------------------------------------------------------------------------------------------------------------
 run = function (dataDir)
 {
   dataDir <- file.path(dataDir)
   rawMatrixList <- readRawMatrices (dataDir)
   matrices <- extractMatrices (rawMatrixList)
-
+  
   tbl.md <- createMetadataTable (dataDir, matrices,
                                  raw.metadata.filename="md-raw.tsv")
   matrices <- normalizeMatrices (matrices)
@@ -32,7 +33,7 @@ readRawMatrices = function (dataDir)
   # within which we will look for one small file "sample.pcm"
   
   
-  filename <- file.path(dataDir, "HOCOMOCO", "hoco.pcm")
+  filename <- file.path(dataDir, "HOCOMOCO", "HOCOMOCOv9_AD_PLAINTEXT_H_WPCM.txt") #old filename: "hoco.pcm"
   printf("checking for readable matrix file:")
   printf("     %s", filename)
   stopifnot(file.exists(filename))
@@ -77,31 +78,39 @@ createMetadataTable = function (dataDir, matrices, raw.metadata.filename)
   tbl.raw <- read.table(filename, sep="\t", header=TRUE, as.is=TRUE)
   tbl.md = data.frame ()
   matrix.ids = names(matrices)
-  
+  geturlname <- function(name){
+    h = getCurlHandle()
+    z <- getURL(paste0("www.uniprot.org/uniprot/?query=",name),
+                followlocation=TRUE, curl=h)
+    getCurlInfo(h)$effective.url # catch the url redirect
+  }
   for (matrix.id in matrix.ids) {
     matrix <- matrices[[matrix.id]]
     short.matrix.name <- sub("\\..*$", "", matrix.id)
     #stopifnot(length(grep(short.matrix.name, tbl.raw$symbol)) == 1)
     #md <- as.list(subset(tbl.raw, symbol==short.matrix.name))
-    dataSource <- "HOCOMOCO"
+    dataSource <- "HOCOMOCOv9_AD_PLAINTEXT_H_PWM_hg19"
     organism <- "Hsapiens"
     
-    split.matrix.name <- unlist(strsplit(short.matrix.name, "_"))[-2]
+    split.matrix.name <- unlist(strsplit(short.matrix.name, "_"))[1]
+    shorter.matrix.name <- split.matrix.name
+    #if (grepl(split.matrix.name, "+")){
+    #  shorter.matrix.name <- unlist(strsplit(split.matrix.name, "+"))[1]
+    #}
     
-    if (grepl(split.matrix.name, "-")){
-      shorter.matrix.name <- unlist(strsplit(split.matrix.name, "-"))[-1]
-    }
-    uri <- 'http://www.uniprot.org/uniprot/?query='
-    idStr <- paste(paste0(shorter.matrix.name, "_HUMAN"), collapse="+or+")
-    format <- '&format=tab'
-    fullUri <- paste0(uri,idStr,format)
-    contentUri <- read.delim(fullUri)
-    protID <- contentUri[[1]]
-    
+    #uri <- paste0("www.uniprot.org/uniprot/?query=",idStr)
+    if (nchar(short.matrix.name) <=9){#!("+" %in% shorter.matrix.name)
+      idStr <- paste0(shorter.matrix.name, "_HUMAN")
+      protIDURL <- geturlname(idStr) #gets the URL for the proteinID from the geneSymbol
+      protID <- unlist(strsplit(protIDURL, "http://www.uniprot.org/uniprot/"))[-1]
+      }else{
+        protID <- rep(NA,1)
+      }
+      
     new.row = list (providerName=matrix.id,
-                    providerId="HOCOMOCO",
-                    dataSource="HOCOMOCO",
-                    geneSymbol=short.matrix.name, #md$symbol
+                    providerId=matrix.id, #"HOCOMOCO v8 and ChiPMunk 3.1"
+                    dataSource="HOCOMOCOv9_AD_PLAINTEXT_H_PWM_hg19",
+                    geneSymbol=shorter.matrix.name, #md$symbol
                     geneId="9606",
                     geneIdType="ENTREZ",
                     proteinId=protID,
@@ -156,7 +165,7 @@ parsePwm = function (text)
                                   as.character(1:cols)))
   # loop over the four lines (for each base respectively)
   row = 1
-
+  
   for(i in 2:line.count){
     linesParsed <- strsplit(lines[[i]], " ")[[1]]
     class(linesParsed) <- "numeric"
