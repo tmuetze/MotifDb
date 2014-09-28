@@ -41,16 +41,17 @@ readRawMatrices = function (dataDir)
   all.lines = scan (filename, what=character(0), sep='\n', quiet=TRUE)
   title.lines = grep ('^>', all.lines)
   title.line.count <<- length (title.lines)
-  max = title.line.count - 1
+  #max = title.line.count - 1
   
   pwms = list ()
   #loops through all motifs in the matrix file, one motif at a time
-  for (i in 1:max) {
+  for (i in 1:title.line.count) {
     start.line = title.lines [i]
-    end.line = title.lines [i+1] - 1
+    end.line = title.lines [i] + 4
     new.pwm = parsePwm (all.lines [start.line:end.line])
     pwms = c (pwms, list (new.pwm))
   } # for i
+  
   
   
   invisible (pwms)
@@ -114,7 +115,7 @@ createMetadataTable = function (dataDir, matrices, raw.metadata.filename)
                     geneId="9606",
                     geneIdType="ENTREZ",
                     proteinId=protID,
-                    proteinIdType="UNIPROT",
+                    proteinIdType="uniprot",
                     organism="Hsapiens",
                     sequenceCount=max(colSums(matrix)),
                     bindingSequence=NA_character_,
